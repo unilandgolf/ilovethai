@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>태국 유니랜드골프 - 관리자 예약 달력</title>
+<style>
+:root{--line:#888;--blue:#1683c5;--teal:#176b72;--bg:#f6f6f6}
+*{box-sizing:border-box}
+body{font-family:Arial,"Malgun Gothic",sans-serif;margin:0;padding:18px;background:#eee;color:#222}
+.wrap{max-width:1120px;margin:auto;background:#fff;border:1px solid #777;padding:12px;display:none}
+header{position:relative;text-align:center;padding:8px 0 18px}
+h1{font-size:20px;font-weight:500;margin:0;border-bottom:1px solid #ccc;display:inline-block;padding:0 18px 8px}
+.logout-btn{position:absolute;right:0;top:0;font-size:12px;padding:4px 8px}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 10px}
+.month{font-size:20px;font-weight:bold}
+button{cursor:pointer;border:1px solid #777;background:#f5f5f5;padding:7px 12px;border-radius:3px}
+button:hover{background:#e6f4fa}
+.nav{display:flex;gap:6px}
+.calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line)}
+.weekday{background:#eee;text-align:center;padding:7px 2px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);font-size:14px}
+.weekday:first-child,.date.sun{color:#c00}.weekday:last-child,.date.sat{color:#00c}
+.date{position:relative;min-height:96px;padding:5px 5px 4px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:#fff;overflow:hidden;cursor:pointer}
+.date.other{background:#f7f7f7;color:#aaa}
+.date.selected{outline:2px solid var(--blue);outline-offset:-2px;background:#eaf7fc}
+.daynum{font-size:13px;margin-bottom:5px}
+.names{display:flex;flex-direction:column;gap:3px}
+.res-name{font-size:12px;line-height:1.25;color:var(--teal);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#f0f8f8;padding:2px 3px;border-radius:2px;font-weight:bold}
+.more{font-size:11px;color:#555}
+.footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:12px;color:#555}
+.editor{margin-top:18px;border:1px solid #aaa;padding:12px;background:#fafafa}
+.editor h2{font-size:16px;margin:0 0 10px}
+.field-group{margin-bottom:10px}
+.editor label{display:block;font-size:13px;margin-bottom:4px;font-weight:bold}
+input[type="text"], input[type="password"]{width:100%;padding:8px;border:1px solid #aaa;font:14px inherit;margin-bottom:8px}
+
+/* 룸타입 선택 영역 스타일 */
+.room-type-group {display:flex; gap:12px; margin-bottom:8px; align-items:center; font-size:13px; flex-wrap:wrap;}
+.room-type-group label {font-weight:normal; display:inline; margin-bottom:0; cursor:pointer;}
+
+.actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.hint{font-size:12px;color:#666;margin-top:8px}
+.preview{position:fixed;z-index:99;display:none;width:min(320px,calc(100vw - 24px));background:#fff;border:1px solid var(--blue);box-shadow:0 5px 22px #0002;border-radius:5px;padding:12px;pointer-events:none}
+.preview-title{font-size:14px;font-weight:bold;color:var(--teal);margin-bottom:6px;border-bottom:1px solid #ddd;padding-bottom:4px}
+.preview-content{font-size:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+
+.login-modal{position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:1000}
+.login-box{background:#fff;padding:24px;border-radius:8px;width:320px;box-shadow:0 4px 20px rgba(0,0,0,0.3);text-align:center}
+.login-box h2{font-size:18px;margin:0 0 16px;color:#333}
+.login-box input{margin-bottom:12px;text-align:center}
+.login-box button{width:100%;background:var(--blue);color:#fff;border:none;padding:10px;font-weight:bold}
+.login-box button:hover{background:#126da5}
+.error-msg{color:#c00;font-size:12px;margin-top:8px;display:none}
+
+@media(max-width:650px){body{padding:5px}.wrap{padding:6px}.date{min-height:76px;padding:3px}.res-name{font-size:10px}.toolbar{flex-wrap:wrap}.month{font-size:17px}h1{font-size:17px}}
+</style>
+</head>
+<body>
+
+<div class="login-modal" id="loginModal">
+  <div class="login-box">
+    <h2>관리자 비밀번호 입력</h2>
+    <form id="loginForm" onsubmit="return false;">
+      <input type="password" id="passwordInput" placeholder="비밀번호를 입력하세요" autofocus>
+      <button type="submit" id="loginBtn">로그인</button>
+      <div class="error-msg" id="errorMsg">비밀번호가 올바르지 않습니다.</div>
+    </form>
+  </div>
+</div>
+
+<div class="wrap" id="mainWrap">
+  <header>
+    <h1>UNILANDGOLF.CO.KR</h1>
+    <button class="logout-btn" id="logoutBtn">로그아웃</button>
+  </header>
+  <div class="toolbar">
+    <div class="month" id="monthLabel"></div>
+    <div class="nav">
+      <button id="prev">◀ 이전 달</button>
+      <button id="today">이번 달</button>
+      <button id="next">다음 달 ▶</button>
+    </div>
+  </div>
+  <div class="calendar" id="calendar"></div>
+  <div class="footer">10/17 라혜린 축 결혼, <span>UNILANDGOLF.CO.KR</span></div>
+  <section class="editor"> 
+    <h2 id="editorTitle">유니랜드</h2>
+    
+    <div class="field-group">
+      
+    <label for="memoTitle">예약코드</label>
+    <input type="text" id="memoTitle" placeholder="">
+    </div>
+
+    <!-- 예약 내용 4줄 구조 및 룸타입 선택 -->
+    
+  <div class="editor h2" style="font-size:14px; font-weight:bold; margin-bottom:8px; border-bottom:1px solid #ddd; padding-bottom:4px;">예약 
+    상세 내용</div>
+    
+    <div class="field-group">
+      <label>1줄: 일정 및 상품</label>
+      <input type="text" id="line1" placeholder="예: 12월29일~01월02일 유니3박5일">
+    </div>
+
+    <div class="field-group">
+      <label>2줄: 항공편 및 룸타입 선택</label>
+      <input type="text" id="line2_flight" placeholder="예: OZ 743/742+1" style="margin-bottom:6px;">
+      <div class="room-type-group">
+        <span style="font-size:13px; color:#555; font-weight:bold;">룸타입:</span>
+        <label><input type="radio" name="roomType" value="싱글룸"> 싱글룸</label>
+        <label><input type="radio" name="roomType" value="1트윈"> 1트윈</label>
+        <label><input type="radio" name="roomType" value="2트윈"> 2트윈</label>
+        <label><input type="radio" name="roomType" value="3트윈"> 3트윈</label>
+        <label><input type="radio" name="roomType" value="4트윈"> 4트윈</label>
+        <label><input type="radio" name="roomType" value="스위트룸"> 스위트룸</label>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label>3줄: 예약자 명단</label>
+      <input type="text" id="line3" placeholder="예: 변남철,최미라,변상태,임지황">
+    </div>
+
+    <div class="field-group">
+      
+    <label>4줄: 특이사항</label>
+    <input type="text" id="line4" placeholder="예: *첫 날 석식포함">
+    </div>
+
+    <div class="actions">
+      <button id="save">메모 저장</button>
+      <button id="clear">메모 삭제</button>
+    </div>
+    
+    <div class="hint">UNILANDGOLF.CO.KR</div>
+  </section>
+</div>
+
+<div class="preview" id="preview">
+  <div class="preview-title" id="previewTitle"></div>
+  <div class="preview-content" id="previewContent"></div>
+</div>
+
+<script>
+const CORRECT_PASSWORD = "1234";
+
+const loginModal = document.getElementById("loginModal");
+const mainWrap = document.getElementById("mainWrap");
+const passwordInput = document.getElementById("passwordInput");
+const errorMsg = document.getElementById("errorMsg");
+
+function checkLogin() {
+  if (passwordInput.value === CORRECT_PASSWORD) {
+    loginModal.style.display = "none";
+    mainWrap.style.display = "block";
+    errorMsg.style.display = "none";
+    passwordInput.value = "";
+    render();
+  } else {
+    errorMsg.style.display = "block";
+  }
+}
+
+document.getElementById("loginForm").addEventListener("submit", checkLogin);
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  loginModal.style.display = "flex";
+  mainWrap.style.display = "none";
+});
+
+const initial = {};
+let reservations = {...initial};
+try {
+  const stored = localStorage.getItem("unilandGolfCalendarMemos_v3");
+  if(stored) reservations = JSON.parse(stored);
+} catch(e){}
+
+let view = new Date(2026, 11, 1);
+let selected = "2026-12-02";
+
+const calendar = document.getElementById("calendar");
+const memoTitle = document.getElementById("memoTitle");
+const line1 = document.getElementById("line1");
+const line2_flight = document.getElementById("line2_flight");
+const line4 = document.getElementById("line4");
+const line3 = document.getElementById("line3");
+const preview = document.getElementById("preview");
+
+const pad = n => String(n).padStart(2, "0");
+const key = (y, m, d) => `${y}-${pad(m+1)}-${pad(d)}`;
+const pretty = k => { const [y, m, d] = k.split("-").map(Number); return `${y}년 ${m}월 ${d}일`; };
+
+function getSelectedRoomType() {
+  const radios = document.getElementsByName("roomType");
+  for (const r of radios) {
+    if (r.checked) return r.value;
+  }
+  return "";
+}
+
+function setSelectedRoomType(val) {
+  const radios = document.getElementsByName("roomType");
+  for (const r of radios) {
+    r.checked = (r.value === val);
+  }
+}
+
+function render(){
+  const y = view.getFullYear(), m = view.getMonth();
+  document.getElementById("monthLabel").textContent = `${y}년 ${m+1}월`;
+  calendar.innerHTML = "";
+  
+  ["일","월","화","수","목","금","토"].forEach((day, i) => {
+    const el = document.createElement("div");
+    el.className = "weekday";
+    el.textContent = day;
+    if(i === 0) el.style.color = "#c00";
+    if(i === 6) el.style.color = "#00c";
+    calendar.appendChild(el);
+  });
+
+  const first = new Date(y, m, 1).getDay();
+  const start = new Date(y, m, 1 - first);
+
+  for(let i = 0; i < 42; i++){
+    const dt = new Date(start);
+    dt.setDate(start.getDate() + i);
+    const k = key(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    
+    const el = document.createElement("div");
+    el.className = "date" + (dt.getMonth() !== m ? " other" : "") + (dt.getDay() === 0 ? " sun" : dt.getDay() === 6 ? " sat" : "") + (k === selected ? " selected" : "");
+    
+    const number = document.createElement("div");
+    number.className = "daynum";
+    number.textContent = dt.getDate();
+    el.appendChild(number);
+
+    const data = reservations[k];
+    if(data && (data.title || data.content)){
+      const box = document.createElement("div");
+      box.className = "names";
+      
+      const n = document.createElement("div");
+      n.className = "res-name";
+      n.textContent = data.title || "(제목 없음)";
+      box.appendChild(n);
+      el.appendChild(box);
+
+      el.addEventListener("mouseenter", e => showPreview(e, k));
+      el.addEventListener("mousemove", movePreview);
+      el.addEventListener("mouseleave", hidePreview);
+    }
+
+    el.addEventListener("click", () => selectDate(k));
+    calendar.appendChild(el);
+  }
+  document.getElementById("editorTitle").textContent = `예약 메모 — ${pretty(selected)}`;
+}
+
+function selectDate(k){
+  selected = k;
+  const data = reservations[k] || { title: "", l1: "", l2: "", room: "", l3: "", l4: "" };
+  memoTitle.value = data.title || "";
+  line1.value = data.l1 || "";
+  line2_flight.value = data.l2 || "";
+  setSelectedRoomType(data.room || "");
+  line3.value = data.l3 || "";
+  line4.value = data.l4 || "";
+  hidePreview();
+  render();
+}
+
+function showPreview(e, k){
+  const data = reservations[k];
+  if(!data) return;
+
+  const roomStr = data.room ? ` (${data.room})` : "";
+  const fullContent = `${data.l1 || ""}\n${(data.l2 || "") + roomStr}\n${data.l3 || ""}\n${data.l4 || ""}`;
+
+  document.getElementById("previewTitle").textContent = data.title || "";
+  document.getElementById("previewContent").textContent = fullContent.trim() || "(상세 내용이 없습니다.)";
+  
+  preview.style.display = "block";
+  movePreview(e);
+}
+
+function movePreview(e){
+  const margin = 12, w = preview.offsetWidth || 320, h = preview.offsetHeight || 130;
+  let x = e.clientX + 16, y = e.clientY + 16;
+  if(x + w > innerWidth - margin) x = e.clientX - w - 16;
+  if(y + h > innerHeight - margin) y = innerHeight - h - margin;
+  preview.style.left = Math.max(margin, x) + "px";
+  preview.style.top = Math.max(margin, y) + "px";
+}
+
+function hidePreview(){
+  preview.style.display = "none";
+}
+
+document.getElementById("save").addEventListener("click", () => {
+  const title = memoTitle.value.trim();
+  const l1 = line1.value.trim();
+  const l2 = line2_flight.value.trim();
+  const room = getSelectedRoomType();
+  const l3 = line3.value.trim();
+  const l4 = line4.value.trim();
+
+  if(title || l1 || l2 || room || l3 || l4){
+    reservations[selected] = { title, l1, l2, room, l3, l4 };
+  } else {
+    delete reservations[selected];
+  }
+
+  try {
+    localStorage.setItem("unilandGolfCalendarMemos_v3", JSON.stringify(reservations));
+  } catch(e){}
+  render();
+});
+
+document.getElementById("clear").addEventListener("click", () => {
+  memoTitle.value = "";
+  line1.value = "";
+  line2_flight.value = "";
+  setSelectedRoomType("");
+  line3.value = "";
+  line4.value = "";
+  delete reservations[selected];
+  try {
+    localStorage.setItem("unilandGolfCalendarMemos_v3", JSON.stringify(reservations));
+  } catch(e){}
+  render();
+});
+
+document.getElementById("prev").addEventListener("click", () => { view.setMonth(view.getMonth() - 1); render(); });
+document.getElementById("next").addEventListener("click", () => { view.setMonth(view.getMonth() + 1); render(); });
+document.getElementById("today").addEventListener("click", () => { const d = new Date(); view = new Date(d.getFullYear(), d.getMonth(), 1); render(); });
+
+selectDate(selected);
+</script>
+</body>
+</html>
